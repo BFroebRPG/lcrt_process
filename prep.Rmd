@@ -1,0 +1,273 @@
+---
+title: "Allocation Prep"
+author: "Brian Froeb"
+date: "11/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(sf)
+library(tidyverse)
+library(tmap)
+library(rpgcolorsr)
+library(rmapshaper)
+library(scales)
+library(mapdeck)
+
+tmap_mode("view")
+far_pal <- rpg_color_pal("rpg_orange_ramp")(10)
+cap_pal <- rpg_color_pal("rpg_blue_ramp")(10)
+suit_pal <- rpg_color_pal("rpg_colors")(10)
+key <- paste0("pk.eyJ1IjoiYmZyb2ViLXJwZ3JvdXAiLCJhIjoiY2toY",
+              "jM2ODUwMDN2bDJ5cGVpZjU4eWYzbSJ9.",
+              "-Fm5keiE7dSTQXK45mI67A")
+```
+
+```{r}
+parcels  <- read_sf("./data/parcels.shp")
+stations <- read_sf("./data/Stations.shp") 
+stn_area <- read_sf("./data/StationAreas.shp") 
+```
+## Processing Steps
+
+## {.tabset}
+
+### Suitability
+
+Parcels can have zero suitability because:
+
+- They are single family homes and not likely to change
+
+- They are in the pipeline and have already been accounted for
+-- This includes parcels that are apart of master planned developments
+
+Parcels that have been identified as a "development opportunity sites" are rated as the highest suitability.
+
+```{r Suit Map, echo=TRUE, eval=FALSE}
+Zero_Suit   <- subset(parcels, parcels$tod_suit == 0)
+Suitability <- subset(parcels, parcels$tod_suit != 0)
+
+Dev_Sites <- subset(parcels, parcels$DO_Site == 1)
+Dev_Sites$PrtlDOS <- as.factor(Dev_Sites$PrtlDOS)
+
+# multiple layer tmap map, Dev Sites (Partial navy #40516f Full purple #8400a8), 0 suit gray, suit ramp blue to teal
+# add station and station areas
+
+tm_shape(Zero_Suit) + tm_polygons(col = "#D3D3D3",
+                                  lwd = 0.1,
+                                  labels = "No Suitability") +
+  tm_shape(Suitability) + tm_polygons(col = "tod_suit",
+                                      lwd = 0.1,
+                                      palette = suit_pal,
+                                      title = "Suitability") +
+  tm_shape(Dev_Sites) + tm_polygons(col = "PrtlDOS",
+                                    lwd = 0.1,
+                                    palette = c("#8400a8", "#40516f"),
+                                    labels = c("Full DO Site", "Partial DO Site"),
+                                    title = "Developmet Sites") +
+  tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) + 
+  tm_shape(stations) + tm_dots()
+```
+
+Because mapdeck does not allow for turning layers on and off I elevated Partial DO Sites so that that dimension can be retained. Let me know what you think.
+
+```{r}
+mapdeck(token = key, 
+        style = mapdeck_style("dark"),
+        location = c(32.8, -79.9)) %>%
+  add_sf(
+      data = parcels %>%
+        mutate(PrtlDOS = PrtlDOS) %>%
+        st_transform(crs = 4326)
+    , layer = "polygon_layer"
+    , fill_colour = "tod_suit"
+    , palette = "viridis"
+    , legend = TRUE
+    , legend_options = list(title = "TOD Suitability")
+    , elevation = "PrtlDOS"
+  ) %>%
+  add_sf(
+    data = stn_area %>% st_transform(crs = 4326)
+    , layer = "station_areas"
+    #, fill_colour ="#FFFFFF"
+    , fill_opacity  = 0
+    , stroke_colour = "#FFFFFF"
+    , stroke_width  = 15
+  ) %>%
+  add_sf(
+    data = stations %>% st_transform(crs = 4326)
+    , layer = "stations"
+    , fill_colour = "#D3D3D3"
+    , fill_opacity = 255
+    , radius_min_pixels = 8
+    , radius_max_pixels = 12
+  ) 
+```
+
+### Base Line Capacity
+
+```{r}
+# ggplot of bcap and seg, just like first page
+parcels %>% 
+  select(seg_nam, contains("BCa")) %>%
+  st_drop_geometry() %>%
+  pivot_longer(names_to = "land_use",
+               cols = contains("BCa"),
+               values_to = "square_ft") %>%
+  mutate(land_use = str_replace(land_use, "_BCa.?", "")) %>%
+  ggplot() +
+  geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
+  scale_fill_rpg(palette = "main and additional",
+                 name    = "Land Use",
+                 labels  = c("Hotel", "Industrial",
+                             "Multi Family", "Office", 
+                             "Other", "Retail", "Single Family")) +
+  scale_y_continuous(labels = comma) +
+  ylab("Square Feet") +
+  theme(axis.text.x = element_text(angle = 45,
+                                   hjust = 1),
+        axis.title.x = element_blank())
+```
+
+
+```{r}
+# Mean Far Map
+# parcels %>%
+#     tm_shape() + tm_polygons(col = "Mean_FAR",
+#                              lwd = 0.1,
+#                              breaks = c(0, 0.25, 0.5, 1, 2, 900),
+#                              labels = c("0 to 0.25", "0.25 to 0.50", 
+#                                         "0.50 to 1.00", "1.00 to 2.00", 
+#                                         "2.01 or more"),
+#                              palette = far_pal,
+#                              title = "Floor Area Ratio") +
+#   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) + 
+#   tm_shape(stations) + tm_dots()
+
+mapdeck(token = key, 
+        style = mapdeck_style("dark"),
+        location = c(32.8, -79.9)) %>%
+  add_sf(
+    data = parcels %>%
+      mutate(FAR_Lab  = cut(Mean_FAR,
+                            breaks = c(0, 0.25, 0.5, 1, 2, 900),
+                            labels = c("[0-0.25)", "[0.25-0.5)",
+                                       "[0.5-1", "[1-2)", "[2-900)"),
+                            include.lowest = TRUE)) %>%
+      st_transform(crs = 4326)
+    , layer = "polygon_layer"
+    , fill_colour = "FAR_Lab"
+    , palette = "orrd"
+    , legend = TRUE
+    , legend_options = list(title = "Floor Area Ratio")
+  ) %>%
+  add_sf(
+    data = stn_area %>% st_transform(crs = 4326)
+    , layer = "station_areas"
+    #, fill_colour ="#FFFFFF"
+    , fill_opacity  = 0
+    , stroke_colour = "#FFFFFF"
+    , stroke_width  = 15
+  ) %>%
+  add_sf(
+    data = stations %>% st_transform(crs = 4326)
+    , layer = "stations"
+    , fill_colour = "#D3D3D3"
+    , fill_opacity = 255
+    , radius_min_pixels = 8
+    , radius_max_pixels = 12
+  ) 
+```
+
+This is the baseline for the allocation process out side of stations areas, parcels within station areas receive additional processing.
+
+### Build Out Capacity
+
+- Each station area, at full build out, will have enough capacity to meet certain targets set by the station typology. 
+
+- We assume that development is likely to be most intense near to the station and on the high suitability sites. 
+
+- We assume that residential development will become a higher proportion of total development at the edges of the station area. 
+
+- Existing development, including development with no suitability for change, counts towards the activity targets and influences the distribution of additional growth within a station area. 
+
+- Pipeline and Existing development are accounted for (changed wording)
+
+<br />
+
+```{r TOD Cap Plot}
+parcels %>% 
+  select(seg_nam, contains("SF_Tot", ignore.case = FALSE)) %>%
+  st_drop_geometry() %>%
+  mutate(Oth_SF_Tot = 0) %>%
+   pivot_longer(names_to = "land_use",
+               cols = contains("Tot"),
+               values_to = "square_ft") %>%
+  filter(!is.null(land_use)) %>%
+  filter(!is.na(seg_nam)) %>%
+  mutate(land_use = str_replace(land_use, "Tot.?", "")) %>%
+  ggplot() +
+  geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
+  scale_fill_rpg(palette = "main and additional",
+                 name    = "Land Use",
+                 labels  = c("Hotel", "Industrial",
+                             "Multi Family", "Office", 
+                             "Other", "Retail", "Single Family")) +
+  scale_y_continuous(labels = comma) +
+  ylab("Square Feet") +
+  theme(axis.text.x = element_text(angle = 45,
+                                   hjust = 1),
+        axis.title.x = element_blank())
+```
+
+```{r Tot map}
+#plot parcel total cap after summing the tot_cap columns also break down by segment
+# parcels %>%
+#     mutate(Capacity = SF_SF_TotC + MF_SF_TotC + Ret_SF_Tot + 
+#                       Ind_SF_Tot + Off_SF_Tot + Hot_SF_Tot) %>%
+#     tm_shape() + tm_polygons(col = "Capacity",
+#                              lwd = 0.1,
+#                              palette = cap_pal,
+#                              title = "Floor Area") +
+#   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) + 
+#   tm_shape(stations) + tm_dots()
+
+mapdeck(token = key, 
+        style = mapdeck_style("dark")) %>%
+  add_sf(
+    data = parcels %>%
+      mutate(Capacity = SF_SF_TotC + MF_SF_TotC + Ret_SF_Tot + 
+                        Ind_SF_Tot + Off_SF_Tot + Hot_SF_Tot,
+             FAR      = Capacity / Sq_Feet,
+             FAR_Lab  = cut(FAR,
+                            breaks = c(0, 0.25, 0.5, 1, 2, 900),
+                            labels = c("[0-0.25)", "[0.25-0.5)",
+                                       "[0.5-1", "[1-2)", "[2-900)"),
+                            include.lowest = TRUE)) %>%
+      st_transform(crs = 4326)
+    , layer = "polygon_layer"
+    , fill_colour = "FAR_Lab"
+    , palette = "orrd"
+    , legend = TRUE
+    , legend_options = list(title = "Capacity Floor Area Ratio")
+  ) %>%
+  add_sf(
+    data = stn_area %>% st_transform(crs = 4326)
+    , layer = "station_areas"
+    #, fill_colour ="#FFFFFF"
+    , fill_opacity  = 0
+    , stroke_colour = "#FFFFFF"
+    , stroke_width  = 15
+  ) %>%
+  add_sf(
+    data = stations %>% st_transform(crs = 4326)
+    , layer = "stations"
+    , fill_colour = "#D3D3D3"
+    , fill_opacity = 255
+    , radius_min_pixels = 8
+    , radius_max_pixels = 12
+  ) 
+```
+
+Add a transition paragraph

@@ -1,0 +1,13 @@
+name: "LCRT Project-Site"
+output_dir: "."
+navbar:
+  title: "LCRT Allocation Processing"
+  left:
+    - text: "Current Conditions"
+      href: index.html
+    - text: "Allocation Prep"
+      href: prep.html
+    
+output: 
+  html_document:
+    css: RPG_Bootstrap_Arial.css
