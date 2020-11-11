@@ -44,30 +44,30 @@ Parcels can have zero suitability because:
 
 Parcels that have been identified as a "development opportunity sites" are rated as the highest suitability.
 
-```{r Suit Map, echo=TRUE, eval=FALSE}
-Zero_Suit   <- subset(parcels, parcels$tod_suit == 0)
-Suitability <- subset(parcels, parcels$tod_suit != 0)
-
-Dev_Sites <- subset(parcels, parcels$DO_Site == 1)
-Dev_Sites$PrtlDOS <- as.factor(Dev_Sites$PrtlDOS)
-
-# multiple layer tmap map, Dev Sites (Partial navy #40516f Full purple #8400a8), 0 suit gray, suit ramp blue to teal
-# add station and station areas
-
-tm_shape(Zero_Suit) + tm_polygons(col = "#D3D3D3",
-                                  lwd = 0.1,
-                                  labels = "No Suitability") +
-  tm_shape(Suitability) + tm_polygons(col = "tod_suit",
-                                      lwd = 0.1,
-                                      palette = suit_pal,
-                                      title = "Suitability") +
-  tm_shape(Dev_Sites) + tm_polygons(col = "PrtlDOS",
-                                    lwd = 0.1,
-                                    palette = c("#8400a8", "#40516f"),
-                                    labels = c("Full DO Site", "Partial DO Site"),
-                                    title = "Developmet Sites") +
-  tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) + 
-  tm_shape(stations) + tm_dots()
+```{r Suit Map, echo=FALSE, eval=FALSE}
+# Zero_Suit   <- subset(parcels, parcels$tod_suit == 0)
+# Suitability <- subset(parcels, parcels$tod_suit != 0)
+# 
+# Dev_Sites <- subset(parcels, parcels$DO_Site == 1)
+# Dev_Sites$PrtlDOS <- as.factor(Dev_Sites$PrtlDOS)
+# 
+# # multiple layer tmap map, Dev Sites (Partial navy #40516f Full purple #8400a8), 0 suit gray, suit ramp blue to teal
+# # add station and station areas
+# 
+# tm_shape(Zero_Suit) + tm_polygons(col = "#D3D3D3",
+#                                   lwd = 0.1,
+#                                   labels = "No Suitability") +
+#   tm_shape(Suitability) + tm_polygons(col = "tod_suit",
+#                                       lwd = 0.1,
+#                                       palette = suit_pal,
+#                                       title = "Suitability") +
+#   tm_shape(Dev_Sites) + tm_polygons(col = "PrtlDOS",
+#                                     lwd = 0.1,
+#                                     palette = c("#8400a8", "#40516f"),
+#                                     labels = c("Full DO Site", "Partial DO Site"),
+#                                     title = "Developmet Sites") +
+#   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) + 
+#   tm_shape(stations) + tm_dots()
 ```
 
 Because mapdeck does not allow for turning layers on and off I elevated Partial DO Sites so that that dimension can be retained. Let me know what you think.
@@ -78,7 +78,7 @@ mapdeck(token = key,
         location = c(32.8, -79.9)) %>%
   add_sf(
       data = parcels %>%
-        mutate(PrtlDOS = PrtlDOS) %>%
+        mutate(PrtlDOS = PrtlDOS * 100) %>%
         st_transform(crs = 4326)
     , layer = "polygon_layer"
     , fill_colour = "tod_suit"
