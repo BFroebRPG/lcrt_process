@@ -32,6 +32,7 @@ types    <- read_csv("./data/Station_types.csv")
 ```
 
 ## Overview
+
 The 2040 parcel-level land use forecast entails allocating expected increments
 of floor area by land use type to appropriate development sites. This requires
 assessing each parcel's suitability for development and estimating a plausible
@@ -110,7 +111,7 @@ mapdeck(token = key,
   add_sf(
       data = parcels %>%
         mutate(PrtlDOS  = as.factor(PrtlDOS),
-               tod_suit = tod_suit * 10) %>%
+               tod_suit = (tod_suit * 10) ^ 2) %>%
         st_transform(crs = 4326)
     , layer = "polygon_layer"
     , fill_colour =  "PrtlDOS"
