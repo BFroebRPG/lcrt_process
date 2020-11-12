@@ -1,5 +1,5 @@
 ---
-title: "Current Conditions"
+title: "Known Development"
 date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
@@ -27,8 +27,7 @@ stations <- read_sf("./data/Stations.shp")
 stn_area <- read_sf("./data/StationAreas.shp") 
 ```
 
-## Known Development
-This section shows the details of current and on-going development in the LCRT
+This section shows the details of current and ongoing development in the LCRT
 corridor. The development forecast depends largely on where development is
 already located ("Existing") and where ongoing development activity and/or 
 development master plans suggest development will occur in the near term 
@@ -45,14 +44,14 @@ Existing development is estimated through the following steps:
 
   - *Parcel-based* estimates rely on local property appraiser data to determine
   each parcel's land use. Building area on each parcel is estimated using
-  building footprint features from Microsoft. <insert link>
+  building footprint features from Microsoft.
   
-  - Each building footprint feature is associated with a single parcel based
-  on the building's centroid location.
+    - Each building footprint feature is associated with a single parcel based
+    on the building's centroid location.
     
-  - Total building floor area is estimated based on footprint area, the
-  building's estimated height, and a floor height assumption. Some constraints
-  apply for different land uses.
+    - Total building floor area is estimated based on footprint area, the
+    building's estimated height, and a floor height assumption. Some constraints
+    apply for different land uses.
   
   - *Point-based* estimates allow known recent developments to be included in
   the existing conditions assessment. Each point represents a recently-delivered
@@ -134,7 +133,7 @@ mapdeck(token = key,
              FAR_Lab  = cut(FAR,
                             breaks = c(0, 0.25, 0.5, 1, 2, 900),
                             labels = c("[0-0.25)", "[0.25-0.5)",
-                                       "[0.5-1", "[1-2)", "[2-900)"),
+                                       "[0.5-1", "[1-2)", "[2 and up)"),
                             include.lowest = TRUE)) %>%
       st_transform(crs = 4326)
     , layer = "polygon_layer"
@@ -235,7 +234,7 @@ mapdeck(token = key,
              FAR_Lab  = cut(FAR,
                             breaks = c(0, 0.25, 0.5, 1, 2, 900),
                             labels = c("[0-0.25)", "[0.25-0.5)",
-                                       "[0.5-1", "[1-2)", "[2-900)"),
+                                       "[0.5-1", "[1-2)", "[2 and up)"),
                             include.lowest = TRUE)) %>%
       st_transform(crs = 4326)
     , layer = "polygon_layer"
@@ -325,7 +324,7 @@ mapdeck(token = key,
              FAR_Lab  = cut(FAR,
                             breaks = c(0, 0.25, 0.5, 1, 2, 900),
                             labels = c("[0-0.25)", "[0.25-0.5)",
-                                       "[0.5-1", "[1-2)", "[2-900)"),
+                                       "[0.5-1", "[1-2)", "[2 and up)"),
                             include.lowest = TRUE)) %>%
       st_transform(crs = 4326)
     , layer = "polygon_layer"

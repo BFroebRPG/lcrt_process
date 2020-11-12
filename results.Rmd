@@ -1,5 +1,5 @@
 ---
-title: "Current Conditions"
+title: "Allocation Results Summary"
 date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
@@ -30,21 +30,21 @@ stn_area <- read_sf("./data/StationAreas.shp")
 control  <- read_csv("./data/ControlTotals.csv")
 segments <- read_sf("./data/corridor_marketsegments.shp")
 ```
-## Pipeline Controls and Values
-```{r PipelingControl Totals Table, out.width= "100%"}
-st_drop_geometry(segments) %>% 
-  select(SegmentNm, SegmentNum) %>%
-  left_join(control, by = c("SegmentNum" = "Segment")) %>%
-  select(SegmentNum, SegmentNm, `Land Use`, PipelineControl, Pipeline) %>%
-  arrange(SegmentNum) %>%
-  select(SegmentNm, `Land Use`, PipelineControl, Pipeline) %>%
-  mutate(PipelineControl = as.numeric(PipelineControl),
-         Pipeline        = as.numeric(Pipeline)) %>%
-  kable() %>%
-  collapse_rows(columns = 1:2, valign = "middle") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
-```
 
+Below is a rundown of the allocation results for pipeline development
+and post-pipeline development (allocation). Each section presents bar charts
+and tables showing the control totals estimated for each market segment and
+the amount of growth modeled through the allocation process.
+
+## {.tabset}
+
+### Pipeline Controls and Values
+Pipeline development control totals come from a tabulation of master planned
+developments, summarized by segment. These estimates are reflected in the
+pipeline points features used to estimate parcel pipeline development. Those
+points also included several smaller planned developments not included in the
+master planned developments roster. Therefor, the total floor area modeled in
+the pipeline exceeds the control totals by about 25 percent.
 ```{r ggplot of Control Totals, out.width= "100%"}
 st_drop_geometry(segments) %>% 
   select(SegmentNm, SegmentNum) %>%
@@ -90,19 +90,28 @@ st_drop_geometry(segments) %>%
 #         axis.title.x = element_blank())
 ```
 
-## Allocation Control Totals and Allocated Values
-
-```{r Table of Allocation Totals, out.width= "100%"}
+```{r PipelingControl Totals Table, out.width= "100%"}
 st_drop_geometry(segments) %>% 
   select(SegmentNm, SegmentNum) %>%
   left_join(control, by = c("SegmentNum" = "Segment")) %>%
-  select(SegmentNum, SegmentNm, `Land Use`, AllocationControl, Allocated) %>%
+  select(SegmentNum, SegmentNm, `Land Use`, PipelineControl, Pipeline) %>%
   arrange(SegmentNum) %>%
-  select(SegmentNm, `Land Use`, AllocationControl, Allocated) %>%
+  select(SegmentNm, `Land Use`, PipelineControl, Pipeline) %>%
+  mutate(PipelineControl = as.numeric(PipelineControl),
+         Pipeline        = as.numeric(Pipeline)) %>%
   kable() %>%
   collapse_rows(columns = 1:2, valign = "middle") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
 ```
+
+
+
+### Allocation Control Totals and Allocated Values
+
+Allocation control totals were tabulated by market segment based on each 
+segment's characteristics and development opportunities. With the exception of
+a modest number of hotel rooms in the Summerville segment, all forecasted
+development was allocated to parecels.
 
 ```{r ggplot of allocation Totals, out.width= "100%"}
 st_drop_geometry(segments) %>% 
@@ -135,5 +144,20 @@ st_drop_geometry(segments) %>%
                                    hjust = 1),
         axis.title.x = element_blank())
 ```
+
+
+```{r Table of Allocation Totals, out.width= "100%"}
+st_drop_geometry(segments) %>% 
+  select(SegmentNm, SegmentNum) %>%
+  left_join(control, by = c("SegmentNum" = "Segment")) %>%
+  select(SegmentNum, SegmentNm, `Land Use`, AllocationControl, Allocated) %>%
+  arrange(SegmentNum) %>%
+  select(SegmentNm, `Land Use`, AllocationControl, Allocated) %>%
+  kable() %>%
+  collapse_rows(columns = 1:2, valign = "middle") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+
 
 Full results available [here](https://storymaps.arcgis.com/stories/2d60f4d4609a4d798e165d69ebd46b65)

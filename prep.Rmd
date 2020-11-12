@@ -1,5 +1,5 @@
 ---
-title: "Current Conditions"
+title: "Allocation Preparation"
 date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
@@ -52,6 +52,7 @@ typologies and associated development targets.
 
 ### Suitability
 Parcel development suitability is estimated based on five criteria:
+
 1. The parcel has been flagged as a "development opportunity site" (DO site). 
 This is 60% of the suitability score, scaled by the proportion of the site in
 the DO site area (some parcels have partial overlap with DO sites).
@@ -111,10 +112,10 @@ mapdeck(token = key,
   add_sf(
       data = parcels %>%
         mutate(PrtlDOS  = as.factor(PrtlDOS),
-               tod_suit = (tod_suit * 10) ^ 2) %>%
+               tod_suit = (tod_suit * 20) ^ 2) %>%
         st_transform(crs = 4326)
     , layer = "polygon_layer"
-    , fill_colour =  "PrtlDOS"
+    , fill_colour =  "DOSProp" #"PrtlDOS"
     , palette = "cyan2yellow"
     , legend = TRUE
     , legend_options = list(title = "Partial DOS Site")
@@ -218,7 +219,7 @@ mapdeck(token = key,
              FAR_Lab  = cut(FAR,
                              breaks = c(0, 0.25, 0.5, 1, 2, 900),
                              labels = c("[0-0.25)", "[0.25-0.5)",
-                                        "[0.5-1", "[1-2)", "[2-900)"),
+                                        "[0.5-1", "[1-2)", "[2 and up)"),
                              include.lowest = TRUE)) %>%
       st_transform(crs = 4326)
     , layer = "polygon_layer"
@@ -264,7 +265,7 @@ for sites at the edges of the station area.
 
 - Residential development represents an increasingly large proportion of total
 development at the edges of the station area. Residential development is still
-expected near station areas but in lower relative proporations than at the
+expected near station areas but in lower relative proportions than at the
 edges.
 
 - Existing and pipeline development counts towards the attainment of activity
@@ -338,7 +339,7 @@ mapdeck(token = key,
              FAR_Lab  = cut(FAR,
                             breaks = c(0, 0.25, 0.5, 1, 2, 900),
                             labels = c("[0-0.25)", "[0.25-0.5)",
-                                       "[0.5-1", "[1-2)", "[2-900)"),
+                                       "[0.5-1", "[1-2)", "[2 and up)"),
                             include.lowest = TRUE)) %>%
       st_transform(crs = 4326)
     , layer = "polygon_layer"
@@ -364,6 +365,11 @@ mapdeck(token = key,
     , radius_max_pixels = 12
   ) 
 ```
+
+The table below lists each station with its type and associated targets for
+residential units and jobs. Stations are listed in order from north (Summerville)
+to south (West Edge)
+
 
 ```{r Job Target, out.width= "100%"}
 types %>%
