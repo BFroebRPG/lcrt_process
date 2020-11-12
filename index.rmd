@@ -5,7 +5,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 library(sf)
 library(tidyverse)
 library(tmap)
@@ -43,11 +43,14 @@ parcels and TAZs are orgnized into seven major segments, each representing
 distinct development markets in the LCRT corridor.
 
 The forecasting process is organized into three key phases:
+
   - **Known development**: How much development is currently on the ground?
   Where is development activity ongoing? 
+  
   - **Allocation preparation**: How much new development is reasonable to expect
   by 2040? What sites are suitable for development? What kind and amount of 
   development is appropriate at each site?
+  
   - **Allocation results**: Where is growth through 2040 expected to go,
   assuming BRT station locations and typologies?
 
@@ -58,7 +61,8 @@ locations and the seven market segments used in the foreacsting analysis.
 ```{r Station and Segment Map, , out.width= "100%"}
 tm_basemap(paste0("http://services.arcgisonline.com/arcgis/rest/services/Canvas/",
     "World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}")) +
-  tm_shape(segments) + tm_polygons(col = "SegmentNm") +
+  tm_shape(segments) + tm_polygons(col = "SegmentNm",
+                                   title = "Segment") +
   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) +
   tm_shape(stations) + tm_dots() + tm_text("stn_name", just = "bottom", size = 0.75) +
   tm_tiles(paste0("http://services.arcgisonline.com/arcgis/rest/services/Canvas/",

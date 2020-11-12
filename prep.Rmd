@@ -110,7 +110,7 @@ mapdeck(token = key,
   add_sf(
       data = parcels %>%
         mutate(PrtlDOS  = as.factor(PrtlDOS),
-               tod_suit = tod_suit * 1000) %>%
+               tod_suit = tod_suit * 10) %>%
         st_transform(crs = 4326)
     , layer = "polygon_layer"
     , fill_colour =  "PrtlDOS"
