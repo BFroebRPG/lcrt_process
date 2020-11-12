@@ -3,10 +3,14 @@ output_dir: "."
 navbar:
   title: "LCRT Allocation Processing"
   left:
-    - text: "Current Conditions"
+    - text: "Welcome"
       href: index.html
+    - text: "Known development"
+      href: baseline.html
     - text: "Allocation Prep"
       href: prep.html
+    - text: "Results"  
+      href: results.html
     
 output: 
   html_document:

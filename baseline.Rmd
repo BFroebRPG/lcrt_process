@@ -1,0 +1,351 @@
+---
+title: "Current Conditions"
+date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(sf)
+library(tidyverse)
+library(tmap)
+library(rpgcolorsr)
+library(rmapshaper)
+library(scales)
+library(mapdeck)
+
+tmap_mode("view")
+far_pal <- rpg_color_pal("rpg_orange_ramp")(10)
+key <- paste0("pk.eyJ1IjoiYmZyb2ViLXJwZ3JvdXAiLCJhIjoiY2toY",
+              "jM2ODUwMDN2bDJ5cGVpZjU4eWYzbSJ9.",
+              "-Fm5keiE7dSTQXK45mI67A")
+```
+
+```{r data imports}
+parcels  <- read_sf("./data/parcels.shp")
+stations <- read_sf("./data/Stations.shp") 
+stn_area <- read_sf("./data/StationAreas.shp") 
+```
+
+## Known Development
+This section shows the details of current and on-going development in the LCRT
+corridor. The development forecast depends largely on where development is
+already located ("Existing") and where ongoing development activity and/or 
+development master plans suggest development will occur in the near term 
+("Pipeline"). Use the tabs below to explore floor area by land use in each 
+market segment and the density of development associated with the existing
+and pipeline phases. The third tab shows the results of adding pipeline 
+development to existing development.
+
+## {.tabset}
+
+### Exisiting
+Existing development is estimated through the following steps:
+  - *Parcel-based* estimates rely on local property appraiser data to determine
+  each parcel's land use. Building area on each parcel is estimated using
+  building footprint features from Microsoft. <insert link>
+  
+    - Each building footprint feature is associated with a single parcel based
+    on the building's centroid location.
+    
+    - Total building floor area is estimated based on footprint area, the
+    building's estimated height, and a floor height assumption. Some constraints
+    apply for different land uses.
+  
+  - *Point-based* estimates allow known recent developments to be included in
+  the existing conditions assessment. Each point represents a recently-delivered
+  building and includes attributes showing estimated building square footage and
+  land use type. The newness of these developments means they may not be
+  reflected in parcel features.
+  
+The point-based data are used to override parcel-based data for parcels where
+recent development activity is observed. Each parcel's land use (from parcel
+data or recent development points) is generalized into one of seven classes,
+used throughout the forecasting analysis:
+  - Single family residential
+  - Multi-family residential
+  - Hotel
+  - Industrial
+  - Office
+  - Retail
+  - Other
+  
+The chart below shows existing development floor area by land use for each
+market segment. 
+
+```{r Existing Sq Ft by LU, out.width= "100%"}
+#melt _Ex columns into long form then bar chart, include corridor and segment charts
+
+parcels %>%
+  subset(!is.na(seg_nam)) %>%
+  select(seg_nam, ends_with("SF_Ex")) %>%
+  st_drop_geometry() %>%
+  pivot_longer(names_to = "land_use",
+               cols = ends_with("Ex"),
+               values_to = "square_ft") %>%
+  mutate(land_use = str_sub(land_use, 1, -4)) %>%
+  mutate(seg_nam  = factor(seg_nam, levels = c("Historic Peninsula", "The Neck",
+                                               "South End", "I-526 Employment", 
+                                               "Northwoods Mall Rivers Ave", 
+                                               "US 78", "Summerville"))) %>%
+  ggplot() +
+  geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
+  scale_fill_rpg(palette = "main and additional",
+                 name    = "Land Use",
+                 labels  = c("Hotel", "Industrial",
+                             "Multi Family", "Office",
+                             "Other", "Retail", "Single Family")) +
+  scale_y_continuous(labels = comma) +
+  ylab("Square Feet") +
+  theme(axis.text.x = element_text(angle = 45,
+                                   hjust = 1),
+        axis.title.x = element_blank())
+```
+
+The map below shows each parcel's floor area ratio (FAR), which is the total
+estimated building area on the parcel divided by its land area. 
+
+```{r Exisiting FAR Map, out.width= "100%"}
+# attempting mapdeck
+# parcels %>%
+#   mutate(bld_area = SF_SF_Ex + MF_SF_Ex + Ret_SF_Ex + Ind_SF_Ex +
+#                     Off_SF_Ex + Hot_SF_Ex + Oth_SF_Ex,
+#          FAR      = bld_area / Sq_Feet)  %>%
+#   fasterize(raster = raster, field = "FAR") %>%
+#     tm_shape() + tm_polygon(col = "FAR",
+#                              breaks = c(0, 0.25, 0.5, 1, 2, 900),
+#                              labels = c("0 to 0.25", "0.25 to 0.50",
+#                                         "0.50 to 1.00", "1.00 to 2.00",
+#                                         "2.01 or more"),
+#                              palette = far_pal,
+#                            title = "Floor Area Ratio") +
+#   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) +
+#   tm_shape(stations) + tm_dots()
+mapdeck(token = key, 
+        style = mapdeck_style("dark"),
+        location = c(32.8, -79.9)) %>%
+  add_sf(
+    data = parcels %>%
+      mutate(bld_area = SF_SF_Ex + MF_SF_Ex + Ret_SF_Ex + Ind_SF_Ex +
+               Off_SF_Ex + Hot_SF_Ex + Oth_SF_Ex,
+             FAR      = bld_area / Sq_Feet,
+             FAR_Lab  = cut(FAR,
+                            breaks = c(0, 0.25, 0.5, 1, 2, 900),
+                            labels = c("[0-0.25)", "[0.25-0.5)",
+                                       "[0.5-1", "[1-2)", "[2-900)"),
+                            include.lowest = TRUE)) %>%
+      st_transform(crs = 4326)
+    , layer = "polygon_layer"
+    , fill_colour = "FAR_Lab"
+    , palette = "orrd"
+    , legend = TRUE
+    , legend_options = list(title = "Floor Area Ratio")
+  ) %>%
+  add_sf(
+    data = stn_area %>% st_transform(crs = 4326)
+    , layer = "station_areas"
+    #, fill_colour ="#FFFFFF"
+    , fill_opacity  = 0
+    , stroke_colour = "#FFFFFF"
+    , stroke_width  = 15
+  ) %>%
+  add_sf(
+    data = stations %>% st_transform(crs = 4326)
+    , layer = "stations"
+    , fill_colour = "#D3D3D3"
+    , fill_opacity = 255
+    , radius_min_pixels = 8
+    , radius_max_pixels = 12
+  ) 
+```
+
+### Pipeline
+The development pipeline consists of ongoing or planned development activity,
+provided as point locations, similar to the *point-based* existing activity
+described in the "Existing" tab. Each point represents a planned or under
+construction building and includes attributes showing estimated building square
+footage and land use type. The land uses are generalized into seven categories
+used throughout the forecasting process.
+
+The pipeline informs the 2040 forecasting process in two ways. First, it records
+expected growth that is part of the development future leading up to 2040. 
+Second, these sites are removed from consideration for forecasting since their
+development future is accounted for in the pipeline analysis.
+
+The chart below shows existing development floor area by land use for each
+market segment.
+
+```{r Pipeline Plot, out.width= "100%"}
+#summarize the pipe fields in the same way as the _EX columns
+parcels %>% 
+  subset(!is.na(seg_nam)) %>%
+  select(seg_nam, contains("Pip", ignore.case = FALSE)) %>%
+  st_drop_geometry() %>%
+  pivot_longer(names_to = "land_use",
+               cols = contains("Pip"),
+               values_to = "square_ft") %>%
+  mutate(land_use = str_replace(land_use, "_Pip.?", "")) %>%
+  mutate(seg_nam  = factor(seg_nam, levels = c("Historic Peninsula", "The Neck",
+                                             "South End", "I-526 Employment", 
+                                             "Northwoods Mall Rivers Ave", 
+                                             "US 78", "Summerville"))) %>%
+  ggplot() +
+  geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
+  scale_fill_rpg(palette = "main and additional",
+                 name    = "Land Use",
+                 labels  = c("Hotel", "Industrial",
+                             "Multi Family", "Office", 
+                             "Other", "Retail", "Single Family")) +
+  scale_y_continuous(labels = comma) +
+  ylab("Square Feet") +
+  theme(axis.text.x = element_text(angle = 45,
+                                   hjust = 1),
+        axis.title.x = element_blank())
+```
+
+The map below shows each parcel's FAR for pipeline development only. This is the
+planned or under construction floor area divided by the parcel area.
+
+```{r Pipe FAR Map, out.width= "100%"}
+# parcels %>%
+#   mutate(bld_area = SF_SF_Pipe + MF_SF_Pipe + Ret_SF_Pip + Ind_SF_Pip +
+#                     Off_SF_Pip + Hot_SF_Pip + Oth_SF_Pip,
+#          FAR      = bld_area / Sq_Feet) %>%
+#   tm_shape() + tm_polygons(col = "FAR",
+#                              lwd = 0.1,
+#                              breaks = c(0, 0.25, 0.5, 1, 2, 900),
+#                              labels = c("0 to 0.25", "0.25 to 0.50", 
+#                                         "0.50 to 1.00", "1.00 to 2.00", 
+#                                         "2.01 or more"),
+#                              palette = far_pal,
+#                            title = "Floor Area Ratio") +
+#   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) + 
+#   tm_shape(stations) + tm_dots()
+
+mapdeck(token = key, 
+        style = mapdeck_style("dark"),
+        location = c(32.8, -79.9)) %>%
+  add_sf(
+    data = parcels %>%
+      mutate(bld_area = SF_SF_Pipe + MF_SF_Pipe + Ret_SF_Pip + Ind_SF_Pip +
+                        Off_SF_Pip + Hot_SF_Pip + Oth_SF_Pip,
+             FAR      = bld_area / Sq_Feet,
+             FAR_Lab  = cut(FAR,
+                            breaks = c(0, 0.25, 0.5, 1, 2, 900),
+                            labels = c("[0-0.25)", "[0.25-0.5)",
+                                       "[0.5-1", "[1-2)", "[2-900)"),
+                            include.lowest = TRUE)) %>%
+      st_transform(crs = 4326)
+    , layer = "polygon_layer"
+    , fill_colour = "FAR_Lab"
+    , palette = "orrd"
+    , legend = TRUE
+    , legend_options = list(title = "Floor Area Ratio")
+  ) %>%
+  add_sf(
+    data = stn_area %>% st_transform(crs = 4326)
+    , layer = "station_areas"
+    #, fill_colour ="#FFFFFF"
+    , fill_opacity  = 0
+    , stroke_colour = "#FFFFFF"
+    , stroke_width  = 15
+  ) %>%
+  add_sf(
+    data = stations %>% st_transform(crs = 4326)
+    , layer = "stations"
+    , fill_colour = "#D3D3D3"
+    , fill_opacity = 255
+    , radius_min_pixels = 8
+    , radius_max_pixels = 12
+  ) 
+```
+
+### Exisiting + Pipeline
+This tab shows the results of combining the existing conditions with the 
+pipeline data, reflecting all known development. The chart below shows total
+known development floor area by land use for each market segment. 
+
+```{r Pipe EX Plot, out.width= "100%"}
+#summarize the EX Pipe fields in the same way as the _EX columns
+parcels %>% 
+  subset(!is.na(seg_nam)) %>%
+  select(seg_nam, contains("SF_ExP")) %>%
+  st_drop_geometry() %>%
+  pivot_longer(names_to = "land_use",
+               cols = contains("ExP"),
+               values_to = "square_ft") %>%
+  mutate(land_use = str_replace(land_use, "_ExP.?", "")) %>%
+  mutate(seg_nam  = factor(seg_nam, levels = c("Historic Peninsula", "The Neck",
+                                               "South End", "I-526 Employment", 
+                                               "Northwoods Mall Rivers Ave", 
+                                               "US 78", "Summerville"))) %>%
+  ggplot() +
+  geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
+  scale_fill_rpg(palette = "main and additional",
+                 name    = "Land Use",
+                 labels  = c("Hotel", "Industrial",
+                             "Multi Family", "Office", 
+                             "Other", "Retail", "Single Family")) +
+  scale_y_continuous(labels = comma) +
+  ylab("Square Feet") +
+  theme(axis.text.x = element_text(angle = 45,
+                                   hjust = 1),
+        axis.title.x = element_blank())
+```
+
+The map below shows FAR estimates for all known development (Existing plus 
+pipeline).
+
+```{r Pipe EX FAR Map, out.width= "100%"}
+# parcels %>%
+#   mutate(bld_area = SF_SF_ExPi + MF_SF_ExPi + Ret_SF_ExP + Ind_SF_ExP +
+#                     Off_SF_ExP + Hot_SF_ExP + Oth_SF_ExP,
+#          FAR      = bld_area / Sq_Feet) %>%
+#   tm_shape() + tm_polygons(col = "FAR",
+#                              lwd = 0.1,
+#                              breaks = c(0, 0.25, 0.5, 1, 2, 900),
+#                              labels = c("0 to 0.25", "0.25 to 0.50", 
+#                                         "0.50 to 1.00", "1.00 to 2.00", 
+#                                         "2.01 or more"),
+#                              palette = far_pal,
+#                            title = "Floor Area Ratio") +
+#   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) + 
+#   tm_shape(stations) + tm_dots()
+
+mapdeck(token = key, 
+        style = mapdeck_style("dark"),
+        location = c(32.8, -79.9)) %>%
+  add_sf(
+    data = parcels %>%
+      mutate(bld_area = SF_SF_ExPi + MF_SF_ExPi + Ret_SF_ExP + Ind_SF_ExP +
+                        Off_SF_ExP + Hot_SF_ExP + Oth_SF_ExP,
+             FAR      = bld_area / Sq_Feet,
+             FAR_Lab  = cut(FAR,
+                            breaks = c(0, 0.25, 0.5, 1, 2, 900),
+                            labels = c("[0-0.25)", "[0.25-0.5)",
+                                       "[0.5-1", "[1-2)", "[2-900)"),
+                            include.lowest = TRUE)) %>%
+      st_transform(crs = 4326)
+    , layer = "polygon_layer"
+    , fill_colour = "FAR_Lab"
+    , palette = "orrd"
+    , legend = TRUE
+    , legend_options = list(title = "Floor Area Ratio")
+  ) %>%
+  add_sf(
+    data = stn_area %>% st_transform(crs = 4326)
+    , layer = "station_areas"
+    #, fill_colour ="#FFFFFF"
+    , fill_opacity  = 0
+    , stroke_colour = "#FFFFFF"
+    , stroke_width  = 15
+  ) %>%
+  add_sf(
+    data = stations %>% st_transform(crs = 4326)
+    , layer = "stations"
+    , fill_colour = "#D3D3D3"
+    , fill_opacity = 255
+    , radius_min_pixels = 8
+    , radius_max_pixels = 12
+  ) 
+```

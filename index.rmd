@@ -1,7 +1,6 @@
 ---
 title: "Current Conditions"
-author: "Brian Froeb"
-date: "11/5/2020"
+date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
 
@@ -23,247 +22,47 @@ key <- paste0("pk.eyJ1IjoiYmZyb2ViLXJwZ3JvdXAiLCJhIjoiY2toY",
 ```
 
 ```{r data imports}
-parcels  <- read_sf("./data/parcels.shp")
-stations <- read_sf("./data/Stations.shp") 
-stn_area <- read_sf("./data/StationAreas.shp") 
+segments  <- read_sf("./data/corridor_marketsegments.shp")
+stations    <- read_sf("./data/Stations.shp") 
+stn_area    <- read_sf("./data/StationAreas.shp") 
 ```
 
-## Square Footage by Landuse 
+This site provides an overview of the land use forecasting process used to
+develop estimates of jobs, residents, and building floor area in the Low
+Country Rapid Transit (LCRT) corridor from the Downtown Charleston peninsula
+to Summerville. 
 
-## {.tabset}
+The objective of the forecasting process is to update 2040 socioeconomic 
+estimates that inform regional travel models and assessments the ridership
+potential of BRT.
 
-### Exisiting
-```{r Existing Sq Ft by LU}
-#melt _Ex columns into long form then bar chart, include corridor and segment charts
+To account for the influence of transit stations on local development potential,
+the forecasting process focuses on individual parcels and results are 
+summarized to the travel analysis zones (TAZs) used in ridership modeling. Both
+parcels and TAZs are orgnized into seven major segments, each representing
+distinct development markets in the LCRT corridor.
 
-parcels %>%
-  select(seg_nam, ends_with("SF_Ex")) %>%
-  st_drop_geometry() %>%
-  pivot_longer(names_to = "land_use",
-               cols = ends_with("Ex"),
-               values_to = "square_ft") %>%
-  mutate(land_use = str_sub(land_use, 1, -4)) %>%
-  ggplot() +
-  geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
-  scale_fill_rpg(palette = "main and additional",
-                 name    = "Land Use",
-                 labels  = c("Hotel", "Industrial",
-                             "Multi Family", "Office",
-                             "Other", "Retail", "Single Family")) +
-  scale_y_continuous(labels = comma) +
-  ylab("Square Feet") +
-  theme(axis.text.x = element_text(angle = 45,
-                                   hjust = 1),
-        axis.title.x = element_blank())
+The forecasting process is organized into three key phases:
+  - **Known development**: How much development is currently on the ground?
+  Where is development activity ongoing? 
+  - **Allocation preparation**: How much new development is reasonable to expect
+  by 2040? What sites are suitable for development? What kind and amount of 
+  development is appropriate at each site?
+  - **Allocation results**: Where is growth through 2040 expected to go,
+  assuming BRT station locations and typologies?
+
+
+The map below shows the LCRT corridor with its potential transit station 
+locations and the seven market segments used in the foreacsting analysis.
+
+```{r Station and Segment Map, , out.width= "100%"}
+tm_basemap(paste0("http://services.arcgisonline.com/arcgis/rest/services/Canvas/",
+    "World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}")) +
+  tm_shape(segments) + tm_polygons(col = "SegmentNm") +
+  tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) +
+  tm_shape(stations) + tm_dots() + tm_text("stn_name", just = "bottom", size = 0.75) +
+  tm_tiles(paste0("http://services.arcgisonline.com/arcgis/rest/services/Canvas/",
+    "World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"), group = "Labels")
+
 ```
 
-```{r Exisiting FAR Map}
-# attempting mapdeck
-# parcels %>%
-#   mutate(bld_area = SF_SF_Ex + MF_SF_Ex + Ret_SF_Ex + Ind_SF_Ex +
-#                     Off_SF_Ex + Hot_SF_Ex + Oth_SF_Ex,
-#          FAR      = bld_area / Sq_Feet)  %>%
-#   fasterize(raster = raster, field = "FAR") %>%
-#     tm_shape() + tm_polygon(col = "FAR",
-#                              breaks = c(0, 0.25, 0.5, 1, 2, 900),
-#                              labels = c("0 to 0.25", "0.25 to 0.50",
-#                                         "0.50 to 1.00", "1.00 to 2.00",
-#                                         "2.01 or more"),
-#                              palette = far_pal,
-#                            title = "Floor Area Ratio") +
-#   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) +
-#   tm_shape(stations) + tm_dots()
-mapdeck(token = key, 
-        style = mapdeck_style("dark"),
-        location = c(32.8, -79.9)) %>%
-  add_sf(
-    data = parcels %>%
-      mutate(bld_area = SF_SF_Ex + MF_SF_Ex + Ret_SF_Ex + Ind_SF_Ex +
-               Off_SF_Ex + Hot_SF_Ex + Oth_SF_Ex,
-             FAR      = bld_area / Sq_Feet,
-             FAR_Lab  = cut(FAR,
-                            breaks = c(0, 0.25, 0.5, 1, 2, 900),
-                            labels = c("[0-0.25)", "[0.25-0.5)",
-                                       "[0.5-1", "[1-2)", "[2-900)"),
-                            include.lowest = TRUE)) %>%
-      st_transform(crs = 4326)
-    , layer = "polygon_layer"
-    , fill_colour = "FAR_Lab"
-    , palette = "orrd"
-    , legend = TRUE
-    , legend_options = list(title = "Floor Area Ratio")
-  ) %>%
-  add_sf(
-    data = stn_area %>% st_transform(crs = 4326)
-    , layer = "station_areas"
-    #, fill_colour ="#FFFFFF"
-    , fill_opacity  = 0
-    , stroke_colour = "#FFFFFF"
-    , stroke_width  = 15
-  ) %>%
-  add_sf(
-    data = stations %>% st_transform(crs = 4326)
-    , layer = "stations"
-    , fill_colour = "#D3D3D3"
-    , fill_opacity = 255
-    , radius_min_pixels = 8
-    , radius_max_pixels = 12
-  ) 
-```
-
-### Pipeline
-```{r Pipeline Plot}
-#summarize the pipe fields in the same way as the _EX columns
-parcels %>% 
-  select(seg_nam, contains("Pip", ignore.case = FALSE)) %>%
-  st_drop_geometry() %>%
-  pivot_longer(names_to = "land_use",
-               cols = contains("Pip"),
-               values_to = "square_ft") %>%
-  mutate(land_use = str_replace(land_use, "_Pip.?", "")) %>%
-  ggplot() +
-  geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
-  scale_fill_rpg(palette = "main and additional",
-                 name    = "Land Use",
-                 labels  = c("Hotel", "Industrial",
-                             "Multi Family", "Office", 
-                             "Other", "Retail", "Single Family")) +
-  scale_y_continuous(labels = comma) +
-  ylab("Square Feet") +
-  theme(axis.text.x = element_text(angle = 45,
-                                   hjust = 1),
-        axis.title.x = element_blank())
-```
-
-```{r Pipe FAR Map}
-# parcels %>%
-#   mutate(bld_area = SF_SF_Pipe + MF_SF_Pipe + Ret_SF_Pip + Ind_SF_Pip +
-#                     Off_SF_Pip + Hot_SF_Pip + Oth_SF_Pip,
-#          FAR      = bld_area / Sq_Feet) %>%
-#   tm_shape() + tm_polygons(col = "FAR",
-#                              lwd = 0.1,
-#                              breaks = c(0, 0.25, 0.5, 1, 2, 900),
-#                              labels = c("0 to 0.25", "0.25 to 0.50", 
-#                                         "0.50 to 1.00", "1.00 to 2.00", 
-#                                         "2.01 or more"),
-#                              palette = far_pal,
-#                            title = "Floor Area Ratio") +
-#   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) + 
-#   tm_shape(stations) + tm_dots()
-
-mapdeck(token = key, 
-        style = mapdeck_style("dark"),
-        location = c(32.8, -79.9)) %>%
-  add_sf(
-    data = parcels %>%
-      mutate(bld_area = SF_SF_Pipe + MF_SF_Pipe + Ret_SF_Pip + Ind_SF_Pip +
-                        Off_SF_Pip + Hot_SF_Pip + Oth_SF_Pip,
-             FAR      = bld_area / Sq_Feet,
-             FAR_Lab  = cut(FAR,
-                            breaks = c(0, 0.25, 0.5, 1, 2, 900),
-                            labels = c("[0-0.25)", "[0.25-0.5)",
-                                       "[0.5-1", "[1-2)", "[2-900)"),
-                            include.lowest = TRUE)) %>%
-      st_transform(crs = 4326)
-    , layer = "polygon_layer"
-    , fill_colour = "FAR_Lab"
-    , palette = "orrd"
-    , legend = TRUE
-    , legend_options = list(title = "Floor Area Ratio")
-  ) %>%
-  add_sf(
-    data = stn_area %>% st_transform(crs = 4326)
-    , layer = "station_areas"
-    #, fill_colour ="#FFFFFF"
-    , fill_opacity  = 0
-    , stroke_colour = "#FFFFFF"
-    , stroke_width  = 15
-  ) %>%
-  add_sf(
-    data = stations %>% st_transform(crs = 4326)
-    , layer = "stations"
-    , fill_colour = "#D3D3D3"
-    , fill_opacity = 255
-    , radius_min_pixels = 8
-    , radius_max_pixels = 12
-  ) 
-```
-
-### Pipe and Exisiting
-```{r Pipe EX Plot}
-#summarize the EX Pipe fields in the same way as the _EX columns
-parcels %>% 
-  select(seg_nam, contains("SF_ExP")) %>%
-  st_drop_geometry() %>%
-  pivot_longer(names_to = "land_use",
-               cols = contains("ExP"),
-               values_to = "square_ft") %>%
-  mutate(land_use = str_replace(land_use, "_ExP.?", "")) %>%
-  
-  ggplot() +
-  geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
-  scale_fill_rpg(palette = "main and additional",
-                 name    = "Land Use",
-                 labels  = c("Hotel", "Industrial",
-                             "Multi Family", "Office", 
-                             "Other", "Retail", "Single Family")) +
-  scale_y_continuous(labels = comma) +
-  ylab("Square Feet") +
-  theme(axis.text.x = element_text(angle = 45,
-                                   hjust = 1),
-        axis.title.x = element_blank())
-```
-
-```{r Pipe EX FAR Map}
-# parcels %>%
-#   mutate(bld_area = SF_SF_ExPi + MF_SF_ExPi + Ret_SF_ExP + Ind_SF_ExP +
-#                     Off_SF_ExP + Hot_SF_ExP + Oth_SF_ExP,
-#          FAR      = bld_area / Sq_Feet) %>%
-#   tm_shape() + tm_polygons(col = "FAR",
-#                              lwd = 0.1,
-#                              breaks = c(0, 0.25, 0.5, 1, 2, 900),
-#                              labels = c("0 to 0.25", "0.25 to 0.50", 
-#                                         "0.50 to 1.00", "1.00 to 2.00", 
-#                                         "2.01 or more"),
-#                              palette = far_pal,
-#                            title = "Floor Area Ratio") +
-#   tm_shape(stn_area) + tm_polygons(col = "#D3D3D3", alpha = 0.1) + 
-#   tm_shape(stations) + tm_dots()
-
-mapdeck(token = key, 
-        style = mapdeck_style("dark"),
-        location = c(32.8, -79.9)) %>%
-  add_sf(
-    data = parcels %>%
-      mutate(bld_area = SF_SF_ExPi + MF_SF_ExPi + Ret_SF_ExP + Ind_SF_ExP +
-                        Off_SF_ExP + Hot_SF_ExP + Oth_SF_ExP,
-             FAR      = bld_area / Sq_Feet,
-             FAR_Lab  = cut(FAR,
-                            breaks = c(0, 0.25, 0.5, 1, 2, 900),
-                            labels = c("[0-0.25)", "[0.25-0.5)",
-                                       "[0.5-1", "[1-2)", "[2-900)"),
-                            include.lowest = TRUE)) %>%
-      st_transform(crs = 4326)
-    , layer = "polygon_layer"
-    , fill_colour = "FAR_Lab"
-    , palette = "orrd"
-    , legend = TRUE
-    , legend_options = list(title = "Floor Area Ratio")
-  ) %>%
-  add_sf(
-    data = stn_area %>% st_transform(crs = 4326)
-    , layer = "station_areas"
-    #, fill_colour ="#FFFFFF"
-    , fill_opacity  = 0
-    , stroke_colour = "#FFFFFF"
-    , stroke_width  = 15
-  ) %>%
-  add_sf(
-    data = stations %>% st_transform(crs = 4326)
-    , layer = "stations"
-    , fill_colour = "#D3D3D3"
-    , fill_opacity = 255
-    , radius_min_pixels = 8
-    , radius_max_pixels = 12
-  ) 
-```

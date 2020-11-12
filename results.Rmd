@@ -1,0 +1,139 @@
+---
+title: "Current Conditions"
+date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(sf)
+library(tidyverse)
+library(tmap)
+library(rpgcolorsr)
+library(rmapshaper)
+library(scales)
+library(mapdeck)
+library(kableExtra)
+
+tmap_mode("view")
+far_pal <- rpg_color_pal("rpg_orange_ramp")(10)
+cap_pal <- rpg_color_pal("rpg_blue_ramp")(10)
+suit_pal <- rpg_color_pal("rpg_colors")(10)
+key <- paste0("pk.eyJ1IjoiYmZyb2ViLXJwZ3JvdXAiLCJhIjoiY2toY",
+              "jM2ODUwMDN2bDJ5cGVpZjU4eWYzbSJ9.",
+              "-Fm5keiE7dSTQXK45mI67A")
+```
+
+```{r Data Import}
+stations <- read_sf("./data/Stations.shp") 
+stn_area <- read_sf("./data/StationAreas.shp") 
+control  <- read_csv("./data/ControlTotals.csv")
+segments <- read_sf("./data/corridor_marketsegments.shp")
+```
+## Pipeline Controls and Values
+```{r PipelingControl Totals Table, out.width= "100%"}
+st_drop_geometry(segments) %>% 
+  select(SegmentNm, SegmentNum) %>%
+  left_join(control, by = c("SegmentNum" = "Segment")) %>%
+  select(SegmentNum, SegmentNm, `Land Use`, PipelineControl, Pipeline) %>%
+  arrange(SegmentNum) %>%
+  select(SegmentNm, `Land Use`, PipelineControl, Pipeline) %>%
+  mutate(PipelineControl = as.numeric(PipelineControl),
+         Pipeline        = as.numeric(Pipeline)) %>%
+  kable() %>%
+  collapse_rows(columns = 1:2, valign = "middle") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) 
+```
+
+```{r ggplot of Control Totals, out.width= "100%"}
+st_drop_geometry(segments) %>% 
+  select(SegmentNm, SegmentNum) %>%
+  left_join(control, by = c("SegmentNum" = "Segment")) %>%
+  select(SegmentNum, SegmentNm, `Land Use`, PipelineControl, Pipeline) %>%
+  arrange(SegmentNum) %>%
+  select(SegmentNm, `Land Use`, PipelineControl, Pipeline) %>%
+  mutate(PipelineControl = as.numeric(PipelineControl),
+         Pipeline         = as.numeric(Pipeline)) %>%
+  pivot_longer(contains("pipe"),
+               names_to = "control",
+               values_to = "sq_feet") %>%
+  mutate(SegmentNm  = factor(SegmentNm, levels = c("Historic Peninsula", "The Neck",
+                                               "South End", "I-526 Employment", 
+                                               "Northwoods Mall Rivers Ave", 
+                                               "US 78", "Summerville"))) %>%
+  mutate(control = factor(control, levels = c("PipelineControl", "Pipeline"))) %>%
+  ggplot() +
+  geom_col(aes(x = SegmentNm, y = sq_feet, fill = `Land Use`)) +
+  facet_grid(~ control) +
+  scale_fill_rpg(palette = "main and additional",
+                 name    = "Land Use",
+                 labels  = c("Hotel", "Industrial",
+                             "Multi Family", "Office", 
+                             "Other", "Retail", "Single Family")) +
+  scale_y_continuous(labels = comma) +
+  ylab("Square Feet") +
+  theme(axis.text.x = element_text(angle = 45,
+                                   hjust = 1),
+        axis.title.x = element_blank())
+# 
+#  ggplot() +
+#   geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
+#   scale_fill_rpg(palette = "main and additional",
+#                  name    = "Land Use",
+#                  labels  = c("Hotel", "Industrial",
+#                              "Multi Family", "Office", 
+#                              "Other", "Retail", "Single Family")) +
+#   scale_y_continuous(labels = comma) +
+#   ylab("Square Feet") +
+#   theme(axis.text.x = element_text(angle = 45,
+#                                    hjust = 1),
+#         axis.title.x = element_blank())
+```
+
+## Allocation Control Totals and Allocated Values
+
+```{r Table of Allocation Totals, out.width= "100%"}
+st_drop_geometry(segments) %>% 
+  select(SegmentNm, SegmentNum) %>%
+  left_join(control, by = c("SegmentNum" = "Segment")) %>%
+  select(SegmentNum, SegmentNm, `Land Use`, AllocationControl, Allocated) %>%
+  arrange(SegmentNum) %>%
+  select(SegmentNm, `Land Use`, AllocationControl, Allocated) %>%
+  kable() %>%
+  collapse_rows(columns = 1:2, valign = "middle") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+```{r ggplot of allocation Totals, out.width= "100%"}
+st_drop_geometry(segments) %>% 
+  select(SegmentNm, SegmentNum) %>%
+  left_join(control , by = c("SegmentNum" = "Segment")) %>%
+  select(SegmentNum, SegmentNm, `Land Use`, AllocationControl, Allocated) %>%
+  arrange(SegmentNum) %>%
+  select(SegmentNm, `Land Use`, AllocationControl, Allocated) %>%
+  mutate(AllocationControl = as.numeric(AllocationControl),
+         Allocated         = as.numeric(Allocated)) %>%
+  pivot_longer(contains("allo"),
+               names_to = "control",
+               values_to = "sq_feet") %>%
+  mutate(SegmentNm  = factor(SegmentNm, levels = c("Historic Peninsula", "The Neck",
+                                             "South End", "I-526 Employment", 
+                                             "Northwoods Mall Rivers Ave", 
+                                             "US 78", "Summerville"))) %>%
+  mutate(control = factor(control, levels = c("AllocationControl", "Allocated"))) %>%
+  ggplot() +
+  geom_col(aes(x = SegmentNm, y = sq_feet, fill = `Land Use`)) +
+  facet_grid(~ control) +
+  scale_fill_rpg(palette = "main and additional",
+                 name    = "Land Use",
+                 labels  = c("Hotel", "Industrial",
+                             "Multi Family", "Office", 
+                             "Other", "Retail", "Single Family")) +
+  scale_y_continuous(labels = comma) +
+  ylab("Square Feet") +
+  theme(axis.text.x = element_text(angle = 45,
+                                   hjust = 1),
+        axis.title.x = element_blank())
+```
+
+Full results available [here](https://storymaps.arcgis.com/stories/2d60f4d4609a4d798e165d69ebd46b65)

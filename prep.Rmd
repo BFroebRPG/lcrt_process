@@ -1,12 +1,11 @@
 ---
-title: "Allocation Prep"
-author: "Brian Froeb"
-date: "11/5/2020"
+title: "Current Conditions"
+date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 library(sf)
 library(tidyverse)
 library(tmap)
@@ -14,6 +13,7 @@ library(rpgcolorsr)
 library(rmapshaper)
 library(scales)
 library(mapdeck)
+library(kableExtra)
 
 tmap_mode("view")
 far_pal <- rpg_color_pal("rpg_orange_ramp")(10)
@@ -24,27 +24,58 @@ key <- paste0("pk.eyJ1IjoiYmZyb2ViLXJwZ3JvdXAiLCJhIjoiY2toY",
               "-Fm5keiE7dSTQXK45mI67A")
 ```
 
-```{r}
+```{r Imports}
 parcels  <- read_sf("./data/parcels.shp")
 stations <- read_sf("./data/Stations.shp") 
 stn_area <- read_sf("./data/StationAreas.shp") 
+types    <- read_csv("./data/station_types.csv")
 ```
-## Processing Steps
+
+## Overview
+The 2040 parcel-level land use forecast entails allocating expected increments
+of floor area by land use type to appropriate development sites. This requires
+assessing each parcel's suitability for development and estimating a plausible
+development program for each site. During allocation, the most suitable sites
+are filled first, each according to its estimated development program, until
+all total expected floor area is distributed among eligible sites.
+
+This section presents the components and results of the development suitability
+assessment and the estimation of each parcel's potential development program, 
+also referred to as "capacity". Capacity estimation is broken out in two phases:
+*baseline capacity* is a simple assessment of development potential basd on
+site characteristics and prevailing development contexts; *build out capacity*
+adjusts baseline estimates for sites in TOD station areas based on station
+typologies and associated development targets.
 
 ## {.tabset}
 
 ### Suitability
+Parcel development suitability is estimated based on five criteria:
+1. The parcel has been flagged as a "development opportunity site" (DO site). 
+This is 60% of the suitability score, scaled by the proportion of the site in
+the DO site area (some parcels have partial overlap with DO sites).
 
-Parcels can have zero suitability because:
+2. The parcel is vacant. This is 15% of the suitability score.
+
+3. The parcel is within a TOD station area (half-mile simple buffer around
+station locations). This is 5% of the suitability score.
+
+4. The parcel is within the TOD walkshed (quarter-mile network-based buffer
+around station  locations). This is 10% of the suitability score.
+
+5. Site size. Larger sites are more suitable than smaller sites. This is 10%
+of the suitability score.
+
+Parcels may have no suitability because:
 
 - They are single family homes and not likely to change
 
-- They are in the pipeline and have already been accounted for
--- This includes parcels that are apart of master planned developments
+- They are in the pipeline and have already been accounted for (this includes 
+parcels that are apart of master planned developments)
 
-Parcels that have been identified as a "development opportunity sites" are rated as the highest suitability.
+The map below shows the suitability evaluation results.
 
-```{r Suit Map, echo=FALSE, eval=FALSE}
+```{r Suit Map Old, echo=FALSE, eval=FALSE}
 # Zero_Suit   <- subset(parcels, parcels$tod_suit == 0)
 # Suitability <- subset(parcels, parcels$tod_suit != 0)
 # 
@@ -70,22 +101,23 @@ Parcels that have been identified as a "development opportunity sites" are rated
 #   tm_shape(stations) + tm_dots()
 ```
 
-Because mapdeck does not allow for turning layers on and off I elevated Partial DO Sites so that that dimension can be retained. Let me know what you think.
 
-```{r}
+
+```{r Suit Map, out.width= "100%"}
 mapdeck(token = key, 
         style = mapdeck_style("dark"),
         location = c(32.8, -79.9)) %>%
   add_sf(
       data = parcels %>%
-        mutate(PrtlDOS = PrtlDOS * 100) %>%
+        # mutate(PrtlDOS = if_else(PrtlDOS == 1, "Partial DOS", "Full DOS")) %>%
         st_transform(crs = 4326)
     , layer = "polygon_layer"
-    , fill_colour = "tod_suit"
-    , palette = "viridis"
+    , fill_colour =  "PrtlDOS"
+    , palette = "cyan2yellow"
     , legend = TRUE
-    , legend_options = list(title = "TOD Suitability")
-    , elevation = "PrtlDOS"
+    , legend_options = list(title = "Partial DOS Site")
+    , elevation = "tod_suit"
+    , elevation_scale = 100
   ) %>%
   add_sf(
     data = stn_area %>% st_transform(crs = 4326)
@@ -105,9 +137,29 @@ mapdeck(token = key,
   ) 
 ```
 
-### Base Line Capacity
+### Baseline Capacity
+Baseline development capacity is estimated throughout the corridor based on
+parcel characteristics and prevailing development patterns.
 
-```{r}
+- Parcels with active uses are assumed to stay the same land use in the future.
+
+- Vacant/undeveloped parcels are assumed to offer development opportunities 
+whose land uses are determined as follows:
+
+  - Small parcels (less than a quarter-acre in area) will be single family
+  residential.
+  
+  - Other parcels' land uses will match the most commonly observed land use
+  (weighted by floor area) among neighboring parcels (within a quarter mile).
+  
+- Intensity of development can be as high as the mean FAR observed among 
+neighboring parcels whose land use matches the parcel's expected land use or
+the current FAR, whichever is greater.
+
+The chart below shows the baseline capacity estimated by land use for each 
+market segment.
+
+```{r baseline cap, out.width= "100%"}
 # ggplot of bcap and seg, just like first page
 parcels %>% 
   select(seg_nam, contains("BCa")) %>%
@@ -116,6 +168,10 @@ parcels %>%
                cols = contains("BCa"),
                values_to = "square_ft") %>%
   mutate(land_use = str_replace(land_use, "_BCa.?", "")) %>%
+  mutate(seg_nam  = factor(seg_nam, levels = c("Historic Peninsula", "The Neck",
+                                               "South End", "I-526 Employment", 
+                                               "Northwoods Mall Rivers Ave", 
+                                               "US 78", "Summerville"))) %>%
   ggplot() +
   geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
   scale_fill_rpg(palette = "main and additional",
@@ -130,8 +186,13 @@ parcels %>%
         axis.title.x = element_blank())
 ```
 
+The map below shows the maximum FAR projected under the baseline capacity
+assumptions. Note that while capacity may exist for relatively dense development,
+this does not mean that development will be forecasted to attain those densities
+in each parcel. It is simply a maximum under the simple assumptions described 
+above.
 
-```{r}
+```{r mean far map, out.width= "100%"}
 # Mean Far Map
 # parcels %>%
 #     tm_shape() + tm_polygons(col = "Mean_FAR",
@@ -150,11 +211,14 @@ mapdeck(token = key,
         location = c(32.8, -79.9)) %>%
   add_sf(
     data = parcels %>%
-      mutate(FAR_Lab  = cut(Mean_FAR,
-                            breaks = c(0, 0.25, 0.5, 1, 2, 900),
-                            labels = c("[0-0.25)", "[0.25-0.5)",
-                                       "[0.5-1", "[1-2)", "[2-900)"),
-                            include.lowest = TRUE)) %>%
+      mutate(Capacity = SF_SF_BCap + MF_SF_BCap + Ret_SF_BCa + 
+                        Ind_SF_BCa + Off_SF_BCa + Hot_SF_BCa,
+             FAR      = Capacity / Sq_Feet,
+             FAR_Lab  = cut(FAR,
+                             breaks = c(0, 0.25, 0.5, 1, 2, 900),
+                             labels = c("[0-0.25)", "[0.25-0.5)",
+                                        "[0.5-1", "[1-2)", "[2-900)"),
+                             include.lowest = TRUE)) %>%
       st_transform(crs = 4326)
     , layer = "polygon_layer"
     , fill_colour = "FAR_Lab"
@@ -180,23 +244,42 @@ mapdeck(token = key,
   ) 
 ```
 
-This is the baseline for the allocation process out side of stations areas, parcels within station areas receive additional processing.
 
 ### Build Out Capacity
+The baseline capacity procedure is run for all parcels throughout the LCRT 
+corridor. For sites within TOD station areas, however, a separate capacity 
+analysis is undertaken, the results of which overwrite the baseline estimates.
+Total build out capacity, then, is a blend of baseline assumptions (outside
+station areas) and TOD assumptions (within station areas).
 
-- Each station area, at full build out, will have enough capacity to meet certain targets set by the station typology. 
+TOD station area capacity assumptions:
 
-- We assume that development is likely to be most intense near to the station and on the high suitability sites. 
+- Each station area, at full build out, will have enough capacity to meet 
+development targets set by the station typology for that station. 
 
-- We assume that residential development will become a higher proportion of total development at the edges of the station area. 
+- Development is likely to be most intense near the station and on high
+suitability sites. Development intensities will generally transition downward
+for sites at the edges of the station area.
 
-- Existing development, including development with no suitability for change, counts towards the activity targets and influences the distribution of additional growth within a station area. 
+- Residential development represents an increasingly large proportion of total
+development at the edges of the station area. Residential development is still
+expected near station areas but in lower relative proporations than at the
+edges.
 
-- Pipeline and Existing development are accounted for (changed wording)
+- Existing and pipeline development counts towards the attainment of activity
+targets and influences the distribution of additional growth within a station 
+area.
+
+- Parcels with no suitability for change (single family residential, pipeline
+parcels, e.g.) are not subject to capacity estimation, but their estimated
+floor areas contribute to station area target attainment as noted above.
+
+The chart below shows the total build out floor area capacity by land use
+and market segment.
 
 <br />
 
-```{r TOD Cap Plot}
+```{r TOD Cap Plot, out.width= "100%"}
 parcels %>% 
   select(seg_nam, contains("SF_Tot", ignore.case = FALSE)) %>%
   st_drop_geometry() %>%
@@ -207,6 +290,10 @@ parcels %>%
   filter(!is.null(land_use)) %>%
   filter(!is.na(seg_nam)) %>%
   mutate(land_use = str_replace(land_use, "Tot.?", "")) %>%
+  mutate(seg_nam  = factor(seg_nam, levels = c("Historic Peninsula", "The Neck",
+                                             "South End", "I-526 Employment", 
+                                             "Northwoods Mall Rivers Ave", 
+                                             "US 78", "Summerville"))) %>%
   ggplot() +
   geom_col(aes(x = seg_nam, y = square_ft, fill = land_use)) +
   scale_fill_rpg(palette = "main and additional",
@@ -221,7 +308,14 @@ parcels %>%
         axis.title.x = element_blank())
 ```
 
-```{r Tot map}
+The map below shows the maximum FAR projected for total build out capacity. It
+is identical to baseline capacity outside of station areas and is modified
+based on TOD parameters inside station area. As with the baseline capacity map,
+the FAR values shown do not imply that development will be forecasted to attain 
+those densities in each parcel. It is simply a maximum under the assumptions
+described above.
+
+```{r Tot map, out.width= "100%"}
 #plot parcel total cap after summing the tot_cap columns also break down by segment
 # parcels %>%
 #     mutate(Capacity = SF_SF_TotC + MF_SF_TotC + Ret_SF_Tot + 
@@ -270,4 +364,10 @@ mapdeck(token = key,
   ) 
 ```
 
-Add a transition paragraph
+```{r Job Target, out.width= "100%"}
+types %>%
+  select(stn_name,stn_type, res_target, job_target) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
