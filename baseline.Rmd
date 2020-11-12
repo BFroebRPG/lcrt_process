@@ -45,12 +45,12 @@ Existing development is estimated through the following steps:
   each parcel's land use. Building area on each parcel is estimated using
   building footprint features from Microsoft. <insert link>
   
-    - Each building footprint feature is associated with a single parcel based
-    on the building's centroid location.
+  - Each building footprint feature is associated with a single parcel based
+  on the building's centroid location.
     
-    - Total building floor area is estimated based on footprint area, the
-    building's estimated height, and a floor height assumption. Some constraints
-    apply for different land uses.
+  - Total building floor area is estimated based on footprint area, the
+  building's estimated height, and a floor height assumption. Some constraints
+  apply for different land uses.
   
   - *Point-based* estimates allow known recent developments to be included in
   the existing conditions assessment. Each point represents a recently-delivered

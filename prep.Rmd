@@ -28,7 +28,7 @@ key <- paste0("pk.eyJ1IjoiYmZyb2ViLXJwZ3JvdXAiLCJhIjoiY2toY",
 parcels  <- read_sf("./data/parcels.shp")
 stations <- read_sf("./data/Stations.shp") 
 stn_area <- read_sf("./data/StationAreas.shp") 
-types    <- read_csv("./data/station_types.csv")
+types    <- read_csv("./data/Station_types.csv")
 ```
 
 ## Overview
@@ -42,7 +42,7 @@ all total expected floor area is distributed among eligible sites.
 This section presents the components and results of the development suitability
 assessment and the estimation of each parcel's potential development program, 
 also referred to as "capacity". Capacity estimation is broken out in two phases:
-*baseline capacity* is a simple assessment of development potential basd on
+*baseline capacity* is a simple assessment of development potential based on
 site characteristics and prevailing development contexts; *build out capacity*
 adjusts baseline estimates for sites in TOD station areas based on station
 typologies and associated development targets.
@@ -109,7 +109,8 @@ mapdeck(token = key,
         location = c(32.8, -79.9)) %>%
   add_sf(
       data = parcels %>%
-        # mutate(PrtlDOS = if_else(PrtlDOS == 1, "Partial DOS", "Full DOS")) %>%
+        mutate(PrtlDOS  = as.factor(PrtlDOS),
+               tod_suit = tod_suit * 1000) %>%
         st_transform(crs = 4326)
     , layer = "polygon_layer"
     , fill_colour =  "PrtlDOS"
@@ -117,7 +118,6 @@ mapdeck(token = key,
     , legend = TRUE
     , legend_options = list(title = "Partial DOS Site")
     , elevation = "tod_suit"
-    , elevation_scale = 100
   ) %>%
   add_sf(
     data = stn_area %>% st_transform(crs = 4326)
