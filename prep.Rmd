@@ -75,7 +75,7 @@ Parcels may have no suitability because:
 - They are in the pipeline and have already been accounted for (this includes 
 parcels that are apart of master planned developments)
 
-The map below shows the suitability evaluation results.
+The map below shows the suitability evaluation results. Parcels are extruded based on their suitability score and colored based on the proportion of a parcel that overlaps a development opportunity site (yellow  is a full site).
 
 ```{r Suit Map Old, echo=FALSE, eval=FALSE}
 # Zero_Suit   <- subset(parcels, parcels$tod_suit == 0)
@@ -110,16 +110,18 @@ mapdeck(token = key,
         style = mapdeck_style("dark"),
         location = c(32.8, -79.9)) %>%
   add_sf(
-      data = parcels %>%
-        mutate(PrtlDOS  = as.factor(PrtlDOS),
-               tod_suit = (tod_suit * 20) ^ 2) %>%
-        st_transform(crs = 4326)
+    data = parcels %>%
+      #subset(DO_Site != 0) %>%
+      mutate(PrtlDOS  = as.factor(PrtlDOS),
+             Area_AC = (DOSProp * 100)) %>%
+      st_transform(crs = 4326)
     , layer = "polygon_layer"
     , fill_colour =  "DOSProp" #"PrtlDOS"
-    , palette = "cyan2yellow"
+    , palette = "viridis"
     , legend = TRUE
-    , legend_options = list(title = "Partial DOS Site")
+    , legend_options = list(title = "DO Site Proportion")
     , elevation = "tod_suit"
+    , elevation_scale = 100
   ) %>%
   add_sf(
     data = stn_area %>% st_transform(crs = 4326)
